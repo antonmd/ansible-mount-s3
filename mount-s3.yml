@@ -1,0 +1,44 @@
+- name: Mount s3 bucket to a directory
+  hosts: all
+  become: true
+  vars:
+    bucket_name: "{{ bucket_name }}"
+    mount_folder: "{{ mount_folder }}"
+
+  tasks:
+
+  - name: Install fuse and fuse3
+    ansible.builtin.package:
+      name: 
+        - fuse
+        - fuse3
+      state: present
+
+  - name: Download geesefs
+    get_url:
+      url: https://github.com/yandex-cloud/geesefs/releases/latest/download/geesefs-linux-amd64
+      dest: /tmp/geesefs-linux-amd64
+      mode: '0755'
+
+  - name: Copy geesefs to /usr/bin
+    copy:
+      src: /tmp/geesefs-linux-amd64
+      dest: /usr/bin/geesefs
+      remote_src: yes
+      mode: '0755'
+
+  - name: Ensure the mount directory exists
+    file:
+      path: "{{ mount_folder }}"
+      state: directory
+      mode: '0755'
+
+  - name: Add line to /etc/fstab
+    lineinfile:
+      path: /etc/fstab
+      line: "{{ bucket_name }} {{ mount_folder }}  fuse.geesefs  _netdev,--iam,allow_other,--file-mode=0666,--dir-mode=0777   0   0"
+      state: present
+
+  - name: Mount all filesystems in /etc/fstab
+    ansible.builtin.command:
+      cmd: mount -a
